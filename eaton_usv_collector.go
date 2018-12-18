@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/l3akage/eaton_usv_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 	"github.com/soniah/gosnmp"
@@ -54,6 +55,11 @@ func init() {
 }
 
 type eatonUsvCollector struct {
+	cfg *config.Config
+}
+
+func newEatonUsvCollector(cfg *config.Config) *eatonUsvCollector {
+	return &eatonUsvCollector{cfg}
 }
 
 func (c eatonUsvCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -197,6 +203,7 @@ func (c eatonUsvCollector) collectTarget(target string, ch chan<- prometheus.Met
 
 func (c eatonUsvCollector) Collect(ch chan<- prometheus.Metric) {
 	targets := strings.Split(*snmpTargets, ",")
+	targets = append(targets, c.cfg.Targets...)
 	wg := &sync.WaitGroup{}
 
 	for _, target := range targets {

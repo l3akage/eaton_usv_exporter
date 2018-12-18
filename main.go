@@ -1,17 +1,20 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 
+	"github.com/l3akage/eaton_usv_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
 )
 
-const version string = "0.1"
+const version string = "0.1.1"
 
 var (
 	showVersion   = flag.Bool("version", false, "Print version information.")
@@ -19,6 +22,8 @@ var (
 	metricsPath   = flag.String("path", "/metrics", "Path under which to expose metrics.")
 	snmpTargets   = flag.String("targets", "", "targets to scrape")
 	snmpCommunity = flag.String("community", "", "SNMP community")
+	configFile    = flag.String("config-file", "config.yml", "Path to config file")
+	cfg           *config.Config
 )
 
 func init() {
@@ -37,12 +42,32 @@ func main() {
 		os.Exit(0)
 	}
 
+	c, err := loadConfig()
+	if err != nil {
+		log.Fatalf("could not load config file. %v", err)
+	}
+	cfg = c
+
+	if *snmpCommunity == "" {
+		snmpCommunity = &cfg.Community
+	}
+
 	startServer()
 }
 
 func printVersion() {
 	fmt.Println("eaton_usv_exporter")
 	fmt.Printf("Version: %s\n", version)
+}
+
+func loadConfig() (*config.Config, error) {
+	log.Infoln("Loading config from", *configFile)
+	b, err := ioutil.ReadFile(*configFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return config.Load(bytes.NewReader(b))
 }
 
 func startServer() {
@@ -66,7 +91,9 @@ func startServer() {
 
 func handleMetricsRequest(w http.ResponseWriter, r *http.Request) {
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(&eatonUsvCollector{})
+
+	c := newEatonUsvCollector(cfg)
+	reg.MustRegister(c)
 
 	promhttp.HandlerFor(reg, promhttp.HandlerOpts{
 		ErrorLog:      log.NewErrorLogger(),
