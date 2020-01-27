@@ -34,14 +34,13 @@ func init() {
 	upDesc = prometheus.NewDesc(prefix+"up", "Scrape of target was successful", l, nil)
 	batteryRemainingDesc = prometheus.NewDesc(prefix+"battery_remaining", "The time remaining actual charge vs actual load", l, nil)
 	batteryLevelDesc = prometheus.NewDesc(prefix+"battery_charge", "The battery level as a percentage of charge", l, nil)
+	outputFrequencyDesc = prometheus.NewDesc(prefix+"output_frequency", "The output frequency.", l, nil)
+	inputFrequencyDesc = prometheus.NewDesc(prefix+"input_frequency", "The input frequency", l, nil)
+	outputLoadDesc = prometheus.NewDesc(prefix+"output_load", "The output load.", l, nil)
+	outputPowerDesc = prometheus.NewDesc(prefix+"output_power", "The output power in VA.", l, nil)
 
 	inputPhaseDesc = prometheus.NewDesc(prefix+"input_voltage", "The input phase voltage", append(l, "phase"), nil)
-	inputFrequencyDesc = prometheus.NewDesc(prefix+"input_frequency", "The input phase frequency", append(l, "phase"), nil)
-
 	outputPhaseDesc = prometheus.NewDesc(prefix+"output_voltage", "The output phase voltage.", append(l, "phase"), nil)
-	outputFrequencyDesc = prometheus.NewDesc(prefix+"output_frequency", "The output phase frequency.", append(l, "phase"), nil)
-	outputLoadDesc = prometheus.NewDesc(prefix+"output_load", "The output load.", append(l, "phase"), nil)
-	outputPowerDesc = prometheus.NewDesc(prefix+"output_power", "The output power in VA.", append(l, "phase"), nil)
 
 	onBatteryDesc = prometheus.NewDesc(prefix+"on_battery", "The UPS on battery / on main status. 1=yes,2=no", l, nil)
 	onBypassDesc = prometheus.NewDesc(prefix+"on_bypass", "The UPS on bypass status. 1=yes,2=no", l, nil)
@@ -90,7 +89,7 @@ func badInputStateToText(status int) string {
 
 func (c eatonUsvCollector) collectInputPhase(snmp *gosnmp.GoSNMP, ch chan<- prometheus.Metric, target string, input int) {
 	for i := 1; i <= input; i++ {
-		oids := []string{"1.3.6.1.4.1.705.1.6.2.1.2." + strconv.Itoa(i) + ".0", "1.3.6.1.4.1.705.1.6.2.1.3." + strconv.Itoa(i) + ".0"}
+		oids := []string{"1.3.6.1.4.1.534.1.3.4." + strconv.Itoa(i) + ".2.1"}
 		result, err := snmp.Get(oids)
 		if err != nil {
 			log.Infof("inputPhase Get() err: %v\n", err)
@@ -103,16 +102,14 @@ func (c eatonUsvCollector) collectInputPhase(snmp *gosnmp.GoSNMP, ch chan<- prom
 			switch variable.Name[1:] {
 			case oids[0]:
 				ch <- prometheus.MustNewConstMetric(inputPhaseDesc, prometheus.GaugeValue, float64(variable.Value.(int)), target, strconv.Itoa(i))
-			case oids[1]:
-				ch <- prometheus.MustNewConstMetric(inputFrequencyDesc, prometheus.GaugeValue, float64(variable.Value.(int)), target, strconv.Itoa(i))
 			}
 		}
 	}
 }
 
-func (c eatonUsvCollector) collectOutputPhase(snmp *gosnmp.GoSNMP, ch chan<- prometheus.Metric, target string, output, power int) {
+func (c eatonUsvCollector) collectOutputPhase(snmp *gosnmp.GoSNMP, ch chan<- prometheus.Metric, target string, output int) {
 	for i := 1; i <= output; i++ {
-		oids := []string{"1.3.6.1.4.1.705.1.7.2.1.2." + strconv.Itoa(i), "1.3.6.1.4.1.705.1.7.2.1.3." + strconv.Itoa(i), "1.3.6.1.4.1.705.1.7.2.1.4." + strconv.Itoa(i)}
+		oids := []string{"1.3.6.1.4.1.534.1.4.4." + strconv.Itoa(i) + ".2.1"}
 		result, err := snmp.Get(oids)
 		if err != nil {
 			log.Infof("outputPhase Get() err: %v\n", err)
@@ -125,11 +122,6 @@ func (c eatonUsvCollector) collectOutputPhase(snmp *gosnmp.GoSNMP, ch chan<- pro
 			switch variable.Name[1:] {
 			case oids[0]:
 				ch <- prometheus.MustNewConstMetric(outputPhaseDesc, prometheus.GaugeValue, float64(variable.Value.(int)), target, strconv.Itoa(i))
-			case oids[1]:
-				ch <- prometheus.MustNewConstMetric(outputFrequencyDesc, prometheus.GaugeValue, float64(variable.Value.(int)), target, strconv.Itoa(i))
-			case oids[2]:
-				ch <- prometheus.MustNewConstMetric(outputLoadDesc, prometheus.GaugeValue, float64(variable.Value.(int)), target, strconv.Itoa(i))
-				ch <- prometheus.MustNewConstMetric(outputPowerDesc, prometheus.GaugeValue, float64((power/100)*variable.Value.(int)), target, strconv.Itoa(i))
 			}
 		}
 	}
@@ -152,15 +144,15 @@ func (c eatonUsvCollector) collectTarget(target string, ch chan<- prometheus.Met
 	}
 	defer snmp.Conn.Close()
 
-	oids := []string{"1.3.6.1.4.1.705.1.5.1.0", "1.3.6.1.4.1.705.1.5.2.0", "1.3.6.1.4.1.705.1.6.1.0"}
-	oids = append(oids, "1.3.6.1.4.1.705.1.7.1.0", "1.3.6.1.4.1.705.1.7.3.0", "1.3.6.1.4.1.705.1.7.4.0", "1.3.6.1.4.1.534.1.6.1.0", "1.3.6.1.4.1.705.1.4.12.0")
+	oids := []string{"1.3.6.1.4.1.534.1.2.1.0", "1.3.6.1.4.1.534.1.2.4.0", "1.3.6.1.4.1.534.1.3.3.0", "1.3.6.1.4.1.534.1.4.3.0", "1.3.6.1.4.1.705.1.7.3.0"}
+	oids = append(oids, "1.3.6.1.4.1.705.1.7.4.0", "1.3.6.1.4.1.534.1.6.1.0", "1.3.6.1.4.1.534.1.4.2.0", "1.3.6.1.4.1.534.1.3.1.0", "1.3.6.1.4.1.534.1.4.1.0", "1.3.6.1.4.1.534.1.10.3.0")
 	result, err2 := snmp.Get(oids)
 	if err2 != nil {
 		log.Infof("Get() err: %v\n", err2)
 		ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, 0, target)
 		return
 	}
-	var inputPhase, outputPhase, power int
+	var inputPhase, outputPhase, power, load int
 
 	for _, variable := range result.Variables {
 		if variable.Value == nil {
@@ -182,12 +174,21 @@ func (c eatonUsvCollector) collectTarget(target string, ch chan<- prometheus.Met
 		case oids[6]:
 			ch <- prometheus.MustNewConstMetric(ambientTemp, prometheus.GaugeValue, float64(variable.Value.(int)), target)
 		case oids[7]:
+			ch <- prometheus.MustNewConstMetric(outputFrequencyDesc, prometheus.GaugeValue, float64(variable.Value.(int)), target)
+		case oids[8]:
+			ch <- prometheus.MustNewConstMetric(inputFrequencyDesc, prometheus.GaugeValue, float64(variable.Value.(int)), target)
+		case oids[9]:
+			ch <- prometheus.MustNewConstMetric(outputLoadDesc, prometheus.GaugeValue, float64(variable.Value.(int)), target)
+			load = variable.Value.(int)
+		case oids[10]:
 			power = variable.Value.(int)
 		}
 	}
 
 	c.collectInputPhase(snmp, ch, target, inputPhase)
-	c.collectOutputPhase(snmp, ch, target, outputPhase, power)
+	c.collectOutputPhase(snmp, ch, target, outputPhase)
+
+	ch <- prometheus.MustNewConstMetric(outputPowerDesc, prometheus.GaugeValue, float64((power/100)*load), target)
 
 	ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, 1, target)
 }
