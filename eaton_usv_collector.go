@@ -24,8 +24,6 @@ var (
 	outputFrequencyDesc  *prometheus.Desc
 	outputLoadDesc       *prometheus.Desc
 	outputPowerDesc      *prometheus.Desc
-	onBatteryDesc        *prometheus.Desc
-	onBypassDesc         *prometheus.Desc
 	ambientTemp          *prometheus.Desc
 )
 
@@ -41,9 +39,6 @@ func init() {
 
 	inputPhaseDesc = prometheus.NewDesc(prefix+"input_voltage", "The input phase voltage", append(l, "phase"), nil)
 	outputPhaseDesc = prometheus.NewDesc(prefix+"output_voltage", "The output phase voltage.", append(l, "phase"), nil)
-
-	onBatteryDesc = prometheus.NewDesc(prefix+"on_battery", "The UPS on battery / on main status. 1=yes,2=no", l, nil)
-	onBypassDesc = prometheus.NewDesc(prefix+"on_bypass", "The UPS on bypass status. 1=yes,2=no", l, nil)
 
 	ambientTemp = prometheus.NewDesc(prefix+"ambient_temp", "The ambient temperature in the vicinity of the UPS (in degrees C)", l, nil)
 
@@ -68,8 +63,6 @@ func (c eatonUsvCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- outputFrequencyDesc
 	ch <- outputLoadDesc
 	ch <- outputPowerDesc
-	ch <- onBatteryDesc
-	ch <- onBypassDesc
 	ch <- ambientTemp
 }
 
@@ -144,8 +137,8 @@ func (c eatonUsvCollector) collectTarget(target string, ch chan<- prometheus.Met
 	}
 	defer snmp.Conn.Close()
 
-	oids := []string{"1.3.6.1.4.1.534.1.2.1.0", "1.3.6.1.4.1.534.1.2.4.0", "1.3.6.1.4.1.534.1.3.3.0", "1.3.6.1.4.1.534.1.4.3.0", "1.3.6.1.4.1.705.1.7.3.0"}
-	oids = append(oids, "1.3.6.1.4.1.705.1.7.4.0", "1.3.6.1.4.1.534.1.6.1.0", "1.3.6.1.4.1.534.1.4.2.0", "1.3.6.1.4.1.534.1.3.1.0", "1.3.6.1.4.1.534.1.4.1.0", "1.3.6.1.4.1.534.1.10.3.0")
+	oids := []string{"1.3.6.1.4.1.534.1.2.1.0", "1.3.6.1.4.1.534.1.2.4.0", "1.3.6.1.4.1.534.1.3.3.0", "1.3.6.1.4.1.534.1.4.3.0"}
+	oids = append(oids, "1.3.6.1.4.1.534.1.6.1.0", "1.3.6.1.4.1.534.1.4.2.0", "1.3.6.1.4.1.534.1.3.1.0", "1.3.6.1.4.1.534.1.4.1.0", "1.3.6.1.4.1.534.1.10.3.0")
 	result, err2 := snmp.Get(oids)
 	if err2 != nil {
 		log.Infof("Get() err: %v\n", err2)
@@ -168,19 +161,15 @@ func (c eatonUsvCollector) collectTarget(target string, ch chan<- prometheus.Met
 		case oids[3]:
 			outputPhase = variable.Value.(int)
 		case oids[4]:
-			ch <- prometheus.MustNewConstMetric(onBatteryDesc, prometheus.GaugeValue, float64(variable.Value.(int)), target)
-		case oids[5]:
-			ch <- prometheus.MustNewConstMetric(onBypassDesc, prometheus.GaugeValue, float64(variable.Value.(int)), target)
-		case oids[6]:
 			ch <- prometheus.MustNewConstMetric(ambientTemp, prometheus.GaugeValue, float64(variable.Value.(int)), target)
-		case oids[7]:
+		case oids[5]:
 			ch <- prometheus.MustNewConstMetric(outputFrequencyDesc, prometheus.GaugeValue, float64(variable.Value.(int)), target)
-		case oids[8]:
+		case oids[6]:
 			ch <- prometheus.MustNewConstMetric(inputFrequencyDesc, prometheus.GaugeValue, float64(variable.Value.(int)), target)
-		case oids[9]:
+		case oids[7]:
 			ch <- prometheus.MustNewConstMetric(outputLoadDesc, prometheus.GaugeValue, float64(variable.Value.(int)), target)
 			load = variable.Value.(int)
-		case oids[10]:
+		case oids[8]:
 			power = variable.Value.(int)
 		}
 	}
