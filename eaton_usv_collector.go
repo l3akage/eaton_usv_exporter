@@ -66,35 +66,29 @@ func (c eatonUsvCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- ambientTemp
 }
 
-func badInputStateToText(status int) string {
-	switch status {
-	case 1:
-		return "no"
-	case 2:
-		return "voltage out of tolerance"
-	case 3:
-		return "frequency out of tolerance"
-	case 4:
-		return "no voltage at all"
-	}
-	return ""
-}
-
 func (c eatonUsvCollector) collectInputPhase(snmp *gosnmp.GoSNMP, ch chan<- prometheus.Metric, target string, input int) {
 	for i := 1; i <= input; i++ {
-		oids := []string{"1.3.6.1.4.1.534.1.3.4." + strconv.Itoa(i) + ".2.1"}
-		result, err := snmp.Get(oids)
-		if err != nil {
-			log.Infof("inputPhase Get() err: %v\n", err)
-			return
-		}
-		for _, variable := range result.Variables {
-			if variable.Value == nil {
+		oids := []string{"1.3.6.1.4.1.534.1.3.4." + strconv.Itoa(i) + ".2.1", "1.3.6.1.4.1.534.1.3.4." + strconv.Itoa(i) + ".2.1.0"}
+		for _, oid := range oids {
+			result, err := snmp.Get([]string{oid})
+			if err != nil {
+				log.Infof("inputPhase Get() err: %v\n", err)
+				return
+			}
+
+			if result.Error == gosnmp.NoSuchName && snmp.Version == gosnmp.Version1 {
+				log.Infof("NoSuchName: %s\n", oid)
 				continue
 			}
-			switch variable.Name[1:] {
-			case oids[0]:
-				ch <- prometheus.MustNewConstMetric(inputPhaseDesc, prometheus.GaugeValue, float64(variable.Value.(int)), target, strconv.Itoa(i))
+
+			for _, v := range result.Variables {
+				if v.Value == nil {
+					continue
+				}
+				switch v.Name[1:] {
+				case oids[0], oids[1]:
+					ch <- prometheus.MustNewConstMetric(inputPhaseDesc, prometheus.GaugeValue, float64(v.Value.(int)), target, strconv.Itoa(i))
+				}
 			}
 		}
 	}
@@ -102,19 +96,27 @@ func (c eatonUsvCollector) collectInputPhase(snmp *gosnmp.GoSNMP, ch chan<- prom
 
 func (c eatonUsvCollector) collectOutputPhase(snmp *gosnmp.GoSNMP, ch chan<- prometheus.Metric, target string, output int) {
 	for i := 1; i <= output; i++ {
-		oids := []string{"1.3.6.1.4.1.534.1.4.4." + strconv.Itoa(i) + ".2.1"}
-		result, err := snmp.Get(oids)
-		if err != nil {
-			log.Infof("outputPhase Get() err: %v\n", err)
-			return
-		}
-		for _, variable := range result.Variables {
-			if variable.Value == nil {
+		oids := []string{"1.3.6.1.4.1.534.1.4.4." + strconv.Itoa(i) + ".2.1", "1.3.6.1.4.1.534.1.4.4." + strconv.Itoa(i) + ".2.1.0"}
+		for _, oid := range oids {
+			result, err := snmp.Get([]string{oid})
+			if err != nil {
+				log.Infof("outputPhase Get() err: %v\n", err)
+				return
+			}
+
+			if result.Error == gosnmp.NoSuchName && snmp.Version == gosnmp.Version1 {
+				log.Infof("NoSuchName: %s\n", oid)
 				continue
 			}
-			switch variable.Name[1:] {
-			case oids[0]:
-				ch <- prometheus.MustNewConstMetric(outputPhaseDesc, prometheus.GaugeValue, float64(variable.Value.(int)), target, strconv.Itoa(i))
+
+			for _, v := range result.Variables {
+				if v.Value == nil {
+					continue
+				}
+				switch v.Name[1:] {
+				case oids[0], oids[1]:
+					ch <- prometheus.MustNewConstMetric(outputPhaseDesc, prometheus.GaugeValue, float64(v.Value.(int)), target, strconv.Itoa(i))
+				}
 			}
 		}
 	}
@@ -141,7 +143,7 @@ func (c eatonUsvCollector) collectTarget(target string, ch chan<- prometheus.Met
 	oids = append(oids, "1.3.6.1.4.1.534.1.6.1.0", "1.3.6.1.4.1.534.1.4.2.0", "1.3.6.1.4.1.534.1.3.1.0", "1.3.6.1.4.1.534.1.4.1.0", "1.3.6.1.4.1.534.1.10.3.0")
 	result, err2 := snmp.Get(oids)
 	if err2 != nil {
-		log.Infof("Get() err: %v\n", err2)
+		log.Infof("Get() err: %v from %s\n", err2, target)
 		ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, 0, target)
 		return
 	}
@@ -188,6 +190,9 @@ func (c eatonUsvCollector) Collect(ch chan<- prometheus.Metric) {
 	wg := &sync.WaitGroup{}
 
 	for _, target := range targets {
+		if target == "" {
+			continue
+		}
 		wg.Add(1)
 		go c.collectTarget(target, ch, wg)
 	}
