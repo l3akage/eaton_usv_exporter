@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gosnmp/gosnmp"
 	"github.com/l3akage/eaton_usv_exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
-	"github.com/soniah/gosnmp"
 )
 
 const prefix = "eaton_usv_"
@@ -72,12 +72,16 @@ func (c eatonUsvCollector) collectInputPhase(snmp *gosnmp.GoSNMP, ch chan<- prom
 		for _, oid := range oids {
 			result, err := snmp.Get([]string{oid})
 			if err != nil {
-				log.Infof("inputPhase Get() err: %v\n", err)
+				if *debug {
+					log.Infof("inputPhase Get() err: %v\n", err)
+				}
 				return
 			}
 
 			if result.Error == gosnmp.NoSuchName && snmp.Version == gosnmp.Version1 {
-				log.Infof("NoSuchName: %s\n", oid)
+				if *debug {
+					log.Infof("NoSuchName: %s\n", oid)
+				}
 				continue
 			}
 
@@ -100,12 +104,16 @@ func (c eatonUsvCollector) collectOutputPhase(snmp *gosnmp.GoSNMP, ch chan<- pro
 		for _, oid := range oids {
 			result, err := snmp.Get([]string{oid})
 			if err != nil {
-				log.Infof("outputPhase Get() err: %v\n", err)
+				if *debug {
+					log.Infof("outputPhase Get() err: %v\n", err)
+				}
 				return
 			}
 
 			if result.Error == gosnmp.NoSuchName && snmp.Version == gosnmp.Version1 {
-				log.Infof("NoSuchName: %s\n", oid)
+				if *debug {
+					log.Infof("NoSuchName: %s\n", oid)
+				}
 				continue
 			}
 
@@ -133,7 +141,9 @@ func (c eatonUsvCollector) collectTarget(target string, ch chan<- prometheus.Met
 	}
 	err := snmp.Connect()
 	if err != nil {
-		log.Infof("Connect() err: %v\n", err)
+		if *debug {
+			log.Infof("Connect() err: %v\n", err)
+		}
 		ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, 0, target)
 		return
 	}
@@ -143,7 +153,9 @@ func (c eatonUsvCollector) collectTarget(target string, ch chan<- prometheus.Met
 	oids = append(oids, "1.3.6.1.4.1.534.1.6.1.0", "1.3.6.1.4.1.534.1.4.2.0", "1.3.6.1.4.1.534.1.3.1.0", "1.3.6.1.4.1.534.1.4.1.0", "1.3.6.1.4.1.534.1.10.3.0")
 	result, err2 := snmp.Get(oids)
 	if err2 != nil {
-		log.Infof("Get() err: %v from %s\n", err2, target)
+		if *debug {
+			log.Infof("Get() err: %v from %s\n", err2, target)
+		}
 		ch <- prometheus.MustNewConstMetric(upDesc, prometheus.GaugeValue, 0, target)
 		return
 	}

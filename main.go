@@ -23,6 +23,7 @@ var (
 	snmpTargets   = flag.String("targets", "", "targets to scrape")
 	snmpCommunity = flag.String("community", "", "SNMP community")
 	configFile    = flag.String("config-file", "config.yml", "Path to config file")
+	debug         = flag.Bool("debug", false, "Show debug log")
 	cfg           *config.Config
 )
 
