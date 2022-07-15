@@ -130,13 +130,14 @@ func (c eatonUsvCollector) collectOutputPhase(snmp *gosnmp.GoSNMP, ch chan<- pro
 	}
 }
 
-func (c eatonUsvCollector) collectTarget(target string, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
+func (c eatonUsvCollector) collectTarget(target string, snmp_version gosnmp.SnmpVersion, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
 	defer wg.Done()
+
 	snmp := &gosnmp.GoSNMP{
 		Target:    target,
 		Port:      161,
 		Community: *snmpCommunity,
-		Version:   gosnmp.Version1,
+		Version:   snmp_version,
 		Timeout:   time.Duration(2) * time.Second,
 	}
 	err := snmp.Connect()
@@ -160,7 +161,6 @@ func (c eatonUsvCollector) collectTarget(target string, ch chan<- prometheus.Met
 		return
 	}
 	var inputPhase, outputPhase, power, load int
-
 	for _, variable := range result.Variables {
 		if variable.Value == nil {
 			continue
@@ -199,6 +199,7 @@ func (c eatonUsvCollector) collectTarget(target string, ch chan<- prometheus.Met
 func (c eatonUsvCollector) Collect(ch chan<- prometheus.Metric) {
 	targets := strings.Split(*snmpTargets, ",")
 	targets = append(targets, c.cfg.Targets...)
+	v2_targets := c.cfg.V2Targets
 	wg := &sync.WaitGroup{}
 
 	for _, target := range targets {
@@ -206,7 +207,15 @@ func (c eatonUsvCollector) Collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 		wg.Add(1)
-		go c.collectTarget(target, ch, wg)
+		go c.collectTarget(target, gosnmp.Version1, ch, wg)
+	}
+
+	for _, v2_target := range v2_targets {
+		if v2_target == "" {
+			continue
+		}
+		wg.Add(1)
+		go c.collectTarget(v2_target, gosnmp.Version2c, ch, wg)
 	}
 
 	wg.Wait()

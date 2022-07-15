@@ -10,6 +10,7 @@ import (
 // Config represents the configuration for the exporter
 type Config struct {
 	Targets   []string `yaml:"targets"`
+	V2Targets []string `yaml:"v2_targets"`
 	Community string   `yaml:"community"`
 }
 
